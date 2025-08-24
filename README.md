@@ -112,10 +112,6 @@ swap 1 0x455e53cbb86018ac2b8092fdcd39d8444affc3f6 for 0xa0b86991c6218b36c1d19d4a
 src/
 ├── components/
 │   ├── FinalChatInterface.jsx    # Main AI chat interface
-│   ├── SwapChatInterface.jsx     # Alternative swap interface
-│   ├── SwapForm.jsx              # Manual swap form
-│   ├── ChatInterface.jsx         # Basic chat component
-│   └── Searching.jsx             # Token search utility
 ├── App.jsx                       # Main app component
 ├── main.jsx                      # App entry point
 └── index.css                     # Global styles
