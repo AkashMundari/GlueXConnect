@@ -28,6 +28,11 @@ An AI-powered cryptocurrency swap assistant that enables seamless token swapping
 - **Wallet**: MetaMask integration
 - **Icons**: Lucide React
 
+## Architecture
+
+<img width="2503" height="1339" alt="architecture" src="https://github.com/user-attachments/assets/88d568d7-e1bd-49ef-9fbf-8fc83bacd453" />
+
+
 ## 📋 Prerequisites
 
 - Node.js 16+ 
