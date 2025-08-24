@@ -12,16 +12,15 @@ import {
   Loader2,
 } from "lucide-react";
 
-// LangChain + Groq
+
 import { ChatGroq } from "@langchain/groq";
 import { HumanMessage } from "@langchain/core/messages";
 
 const SwapChatInterface = () => {
-  // Wallet state
+
   const [isConnected, setIsConnected] = useState(false);
   const [userAddress, setUserAddress] = useState("");
 
-  // Chat state
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -36,18 +35,15 @@ const SwapChatInterface = () => {
 
   const messagesEndRef = useRef(null);
 
-  // 🔑 Groq client (move key to env in production)
+
   const llm = new ChatGroq({
-    apiKey: "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",
+    apiKey: import.meta.env.VITE_GROQ_API_KEY,
     model: "llama3-8b-8192",
   });
 
-  // CryptoRank API key
-  const cryptoRankApiKey =
-    "b6f7fdaaaa32b090872c09a8cb72ed3b059f06890a74d08c00be732a079c";
+  const cryptoRankApiKey = import.meta.env.VITE_CRYPTORANK_API_KEY;
 
-  const uniquePID =
-    "8abfa3e8386ac5a7e351853597ec35d7963e747eed2865222c33c1573958cf12";
+  const uniquePID = import.meta.env.VITE_GLUEX_PID;
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -57,10 +53,10 @@ const SwapChatInterface = () => {
     scrollToBottom();
   }, [messages]);
 
-  // CryptoRank API integration
+
   const getTokenContractAddress = async (symbol, blockchainKey) => {
     try {
-      // Step 1: Get all currencies to find the ID of the target token
+   
       const mapUrl = "https://api.cryptorank.io/v2/currencies/map";
       const mapResponse = await fetch(mapUrl, {
         method: "GET",
@@ -84,7 +80,7 @@ const SwapChatInterface = () => {
 
       const cryptoId = cryptoInfo.id;
 
-      // Step 2: Fetch detailed currency data using the found ID
+
       const currencyUrl = `https://api.cryptorank.io/v2/currencies/${cryptoId}`;
       const currencyResponse = await fetch(currencyUrl, {
         method: "GET",
@@ -102,7 +98,7 @@ const SwapChatInterface = () => {
       const currencyData = await currencyResponse.json();
 
       if (currencyData.data && currencyData.data.contracts) {
-        // Filter contracts by blockchain key
+   
         const filteredContracts = currencyData.data.contracts.filter(
           (contract) =>
             contract.platform &&
@@ -134,7 +130,7 @@ e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain
     }
   };
 
-  // Wallet functions
+
   const handleConnectWallet = async () => {
     if (typeof window.ethereum !== "undefined") {
       try {
@@ -169,7 +165,7 @@ e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain
     );
   };
 
-  // Chat functions
+
   const addMessage = (type, content, swapData = null) => {
     const newMessage = {
       id: Date.now(),
@@ -181,7 +177,7 @@ e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain
     setMessages((prev) => [...prev, newMessage]);
   };
 
-  // 🔥 Swap API integration
+
   const fetchSwapQuote = async ({
     inputTokenAddress,
     outputTokenAddress,
@@ -221,12 +217,11 @@ e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain
       console.log("Quote Response:", data);
       return {
         inputAmount,
-        outputAmount: data.result.outputAmount / 10 ** outputTokenDecimals, // scale using actual decimals
+        outputAmount: data.result.outputAmount / 10 ** outputTokenDecimals, 
         inputTokenAddress,
         outputTokenAddress,
         inputTokenDecimals,
         outputTokenDecimals,
-        // Store the full API response for transaction execution
         apiResponse: data.result,
         chainID,
       };
@@ -236,7 +231,7 @@ e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain
     }
   };
 
-  // Execute swap transaction
+
   const executeSwap = async (swapData) => {
     try {
       addMessage("bot", "🔄 Initiating swap transaction...");
@@ -247,7 +242,7 @@ e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain
         throw new Error("Invalid swap data received from API");
       }
 
-      // Build transaction object
+ 
       const transactionParams = {
         from: userAddress,
         to: apiResponse.router,
@@ -255,12 +250,11 @@ e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain
         value: apiResponse.value || "0x0",
         gas: apiResponse.computationUnits
           ? `0x${apiResponse.computationUnits.toString(16)}`
-          : "0x1E8480", // Default gas limit
+          : "0x1E8480", 
       };
 
       console.log("Transaction Params:", transactionParams);
 
-      // Send transaction through MetaMask
       const txHash = await window.ethereum.request({
         method: "eth_sendTransaction",
         params: [transactionParams],
@@ -271,12 +265,12 @@ e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain
         `✅ Transaction submitted successfully!\n\nTransaction Hash: ${txHash}\n\nYour swap is being processed. Please wait for confirmation on the blockchain.`
       );
 
-      // Wait for transaction confirmation (optional)
+
       const waitForConfirmation = async () => {
         try {
           let receipt = null;
           let attempts = 0;
-          const maxAttempts = 30; // Wait up to 5 minutes (30 * 10 seconds)
+          const maxAttempts = 30;
 
           while (!receipt && attempts < maxAttempts) {
             try {
@@ -285,11 +279,10 @@ e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain
                 params: [txHash],
               });
             } catch (e) {
-              // Transaction might not be mined yet
             }
 
             if (!receipt) {
-              await new Promise((resolve) => setTimeout(resolve, 10000)); // Wait 10 seconds
+              await new Promise((resolve) => setTimeout(resolve, 10000)); 
               attempts++;
             }
           }
@@ -320,7 +313,7 @@ e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain
         }
       };
 
-      // Start confirmation check
+  
       waitForConfirmation();
     } catch (error) {
       console.error("Transaction Error:", error);
@@ -338,10 +331,10 @@ e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain
     }
   };
 
-  // 🔥 Updated AI Processing with address support (bypass CryptoRank when addresses provided)
+ 
   const processWithAI = async (message) => {
     try {
-      // First step: Ask model ONLY to detect swaps with token symbols OR addresses
+    
       const detection = await llm.invoke([
         new HumanMessage(
           `You are a strict JSON detector.
@@ -371,7 +364,7 @@ If it's NOT a swap request, return exactly: {"swap": false}`
         parsed = { swap: false };
       }
 
-      // If swap detected → return swap intent
+ 
       if (
         parsed.inputAmount &&
         parsed.chainID &&
@@ -385,7 +378,7 @@ If it's NOT a swap request, return exactly: {"swap": false}`
         };
       }
 
-      // Otherwise → ask model for a normal reply
+
       const normalReply = await llm.invoke([new HumanMessage(message)]);
       return {
         intent: "general",
@@ -413,22 +406,22 @@ If it's NOT a swap request, return exactly: {"swap": false}`
         try {
           let inputTokenData, outputTokenData;
 
-          // ✅ If user provided addresses → bypass CryptoRank
+     
           if (aiResponse.swapData.inputTokenAddress) {
             inputTokenData = {
               address: aiResponse.swapData.inputTokenAddress,
-              decimals: 18, // default (cannot infer without chain call)
+              decimals: 18, 
               symbol: "TOKEN1",
               blockchain: aiResponse.swapData.chainID,
             };
             outputTokenData = {
               address: aiResponse.swapData.outputTokenAddress,
-              decimals: 18, // default
+              decimals: 18,
               symbol: "TOKEN2",
               blockchain: aiResponse.swapData.chainID,
             };
           } else {
-            // ✅ Else → fetch addresses via CryptoRank
+         
             addMessage("bot", "🔍 Fetching token contract addresses...");
 
             [inputTokenData, outputTokenData] = await Promise.all([
@@ -448,7 +441,6 @@ If it's NOT a swap request, return exactly: {"swap": false}`
             );
           }
 
-          // Now fetch swap quote using the contract addresses
           const quote = await fetchSwapQuote({
             inputTokenAddress: inputTokenData.address,
             outputTokenAddress: outputTokenData.address,
