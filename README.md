@@ -1,15 +1,21 @@
 # GlueX Connect 🤖⚡
 
-An AI-powered cryptocurrency swap assistant that enables seamless token swapping across multiple blockchains using natural language commands. Built with React, LangChain, and the GlueX Router API.
+An AI-powered cryptocurrency swap assistant that enables seamless token swapping across multiple blockchains using natural language commands. Built with React, LangChain, and the **GlueX Router API**.
+
+<img width="900" height="800" alt="04" src="https://github.com/user-attachments/assets/f50e371d-5441-4756-9322-c3d4987a0bff" center />
+
 
 ## 🚀 Features
+
+<img width="900" height="800" alt="05" src="https://github.com/user-attachments/assets/9fcb806d-b0ec-4f29-9588-c62f1885a51e" />
+
 
 - **Natural Language Processing**: Chat with an AI assistant to perform token swaps using simple commands
 - **Multi-Chain Support**: Swap tokens across multiple blockchains including Ethereum, HyperEVM, Arbitrum, Base, Polygon, and more
 - **Automatic Token Resolution**: Input token symbols and let the AI fetch contract addresses automatically
 - **Real-Time Price Quotes**: Get accurate swap quotes before executing transactions
 - **Wallet Integration**: Connect your MetaMask wallet for seamless transactions
-- **Smart Contract Discovery**: Automatically finds token contract addresses using CryptoRank API
+- **Smart Contract Discovery**: Automatically finds token contract addresses using CryptoRank API & other search apis
 
 ## 🛠️ Tech Stack
 
@@ -28,13 +34,13 @@ An AI-powered cryptocurrency swap assistant that enables seamless token swapping
 - MetaMask browser extension
 - Groq API key
 - CryptoRank API key
-- GlueX Router API key
+- GlueX PID
 
 ## 🔧 Installation
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/gluexconnect.git
+   git clone https://github.com/AkashMundari/gluexconnect.git
    cd gluexconnect
    ```
 
@@ -48,7 +54,7 @@ An AI-powered cryptocurrency swap assistant that enables seamless token swapping
    ```env
    VITE_GROQ_API_KEY=your_groq_api_key_here
    VITE_CRYPTORANK_API_KEY=your_cryptorank_api_key_here
-   VITE_GLUEX_API_KEY=your_gluex_api_key_here
+   VITE_GLUEX_PID=your_gluex_pid_here
    ```
 
 4. **Start the development server**
@@ -67,14 +73,6 @@ The AI assistant understands natural language commands for token swaps:
 
 - `swap 1 USDC for ETH on ethereum`
 - `I want to swap 100 kHYPE for USOL on hyperevm`
-- `exchange 0.5 ETH to USDT on base chain`
-
-### Contract Address Swaps
-
-You can also use contract addresses directly:
-```
-swap 1 0x455e53cbb86018ac2b8092fdcd39d8444affc3f6 for 0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48 on ethereum
-```
 
 ### Supported Chains
 
@@ -102,9 +100,9 @@ swap 1 0x455e53cbb86018ac2b8092fdcd39d8444affc3f6 for 0xa0b86991c6218b36c1d19d4a
 2. Get your API key
 3. Add to your `.env.local` file
 
-### GlueX Router API
-1. Contact GlueX team for API access
-2. Add your API key to the environment
+### GlueX PID
+1. Creat an account on the GlueX portal
+2. Add your PID to the environment
 
 ## 📁 Project Structure
 
@@ -155,37 +153,10 @@ The project uses LangChain with Groq's Llama3-8B model to:
 - `npm run preview` - Preview production build
 - `npm run lint` - Run ESLint
 
-### Adding New Features
-
-1. **New AI Commands**: Update the prompt engineering in `FinalChatInterface.jsx`
-2. **Additional Chains**: Add new chain IDs to the supported chains list
-3. **Token Sources**: Integrate additional token data APIs
-4. **UI Components**: Add new components in the `components/` directory
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
 ## 🙏 Acknowledgments
 
 - [GlueX](https://gluex.xyz/) for the cross-chain router API
 - [Groq](https://groq.com/) for the fast AI inference
 - [CryptoRank](https://cryptorank.io/) for token data
 - [LangChain](https://langchain.com/) for AI framework
-- The DeFi and Web3 community for inspiration
 
-## 📞 Support
-
-For support, please open an issue on GitHub or contact the development team.
-
----
-
-**Built with ❤️ for the Web3 community**
