@@ -26,7 +26,7 @@ const SwapChatInterface = () => {
       id: 1,
       type: "bot",
       content:
-        "Hello! I'm your AI assistant. I can help you swap tokens on the HyperEVM chain powered by Glue X's router api. Just tell me what tokens you'd like to swap and the amount!",
+        "Hello! I'm your AI assistant. I can help you swap tokens powered by Glue X's router api. Just tell me what tokens you'd like to swap and the amount!",
       timestamp: new Date(),
     },
   ]);
@@ -561,7 +561,7 @@ If it's NOT a swap request, return exactly: {"swap": false}`
       <nav className="bg-white/90 backdrop-blur border-b border-gray-200 px-6 py-4 shadow-sm sticky top-0 z-10">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="text-lg font-semibold text-gray-800">
-            🤖 AI Swap Assistant
+            🤖 GlueX Connect
           </div>
           <div>
             {isConnected ? (
@@ -678,3 +678,4 @@ If it's NOT a swap request, return exactly: {"swap": false}`
 };
 
 export default SwapChatInterface;
+
