@@ -36,9 +36,9 @@ const SwapChatInterface = () => {
 
   const messagesEndRef = useRef(null);
 
-  // 🔑 Groq client
+  // 🔑 Groq client (move key to env in production)
   const llm = new ChatGroq({
-    apiKey: "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", // store safely in .env
+    apiKey: "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",
     model: "llama3-8b-8192",
   });
 
@@ -119,9 +119,9 @@ const SwapChatInterface = () => {
         } else {
           throw new Error(
             `No contract found for ${symbol} on ${blockchainKey}
-  
+
 You may try using the exact token contract address of the tokens you want to swap.
-  
+
 e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain_name>`
           );
         }
@@ -190,7 +190,7 @@ e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain
     outputTokenDecimals,
     chainID,
   }) => {
-    const url = "https://router.gluex.xyz/v1/price";
+    const url = "https://router.gluex.xyz/v1/quote";
 
     const payload = {
       chainID: chainID,
@@ -218,7 +218,7 @@ e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain
       }
 
       const data = await response.json();
-      console.log(data);
+      console.log("Quote Response:", data);
       return {
         inputAmount,
         outputAmount: data.result.outputAmount / 10 ** outputTokenDecimals, // scale using actual decimals
@@ -226,6 +226,9 @@ e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain
         outputTokenAddress,
         inputTokenDecimals,
         outputTokenDecimals,
+        // Store the full API response for transaction execution
+        apiResponse: data.result,
+        chainID,
       };
     } catch (error) {
       console.error("Swap API Error:", error);
@@ -233,21 +236,130 @@ e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain
     }
   };
 
-  // 🔥 Replace mock AI with Groq LangChain
-  // 🔥 Updated AI Processing with Structured Extraction
+  // Execute swap transaction
+  const executeSwap = async (swapData) => {
+    try {
+      addMessage("bot", "🔄 Initiating swap transaction...");
+
+      const { apiResponse } = swapData;
+
+      if (!apiResponse || !apiResponse.router || !apiResponse.calldata) {
+        throw new Error("Invalid swap data received from API");
+      }
+
+      // Build transaction object
+      const transactionParams = {
+        from: userAddress,
+        to: apiResponse.router,
+        data: apiResponse.calldata,
+        value: apiResponse.value || "0x0",
+        gas: apiResponse.computationUnits
+          ? `0x${apiResponse.computationUnits.toString(16)}`
+          : "0x1E8480", // Default gas limit
+      };
+
+      console.log("Transaction Params:", transactionParams);
+
+      // Send transaction through MetaMask
+      const txHash = await window.ethereum.request({
+        method: "eth_sendTransaction",
+        params: [transactionParams],
+      });
+
+      addMessage(
+        "bot",
+        `✅ Transaction submitted successfully!\n\nTransaction Hash: ${txHash}\n\nYour swap is being processed. Please wait for confirmation on the blockchain.`
+      );
+
+      // Wait for transaction confirmation (optional)
+      const waitForConfirmation = async () => {
+        try {
+          let receipt = null;
+          let attempts = 0;
+          const maxAttempts = 30; // Wait up to 5 minutes (30 * 10 seconds)
+
+          while (!receipt && attempts < maxAttempts) {
+            try {
+              receipt = await window.ethereum.request({
+                method: "eth_getTransactionReceipt",
+                params: [txHash],
+              });
+            } catch (e) {
+              // Transaction might not be mined yet
+            }
+
+            if (!receipt) {
+              await new Promise((resolve) => setTimeout(resolve, 10000)); // Wait 10 seconds
+              attempts++;
+            }
+          }
+
+          if (receipt) {
+            if (receipt.status === "0x1") {
+              addMessage(
+                "bot",
+                `🎉 Swap completed successfully!\n\nTransaction confirmed in block ${parseInt(
+                  receipt.blockNumber,
+                  16
+                )}`
+              );
+            } else {
+              addMessage(
+                "bot",
+                "❌ Transaction failed. Please check the transaction hash on a blockchain explorer."
+              );
+            }
+          } else {
+            addMessage(
+              "bot",
+              "⏳ Transaction is taking longer than expected. Please check the transaction hash on a blockchain explorer."
+            );
+          }
+        } catch (error) {
+          console.error("Error waiting for confirmation:", error);
+        }
+      };
+
+      // Start confirmation check
+      waitForConfirmation();
+    } catch (error) {
+      console.error("Transaction Error:", error);
+
+      let errorMessage = "❌ Transaction failed: ";
+      if (error.code === 4001) {
+        errorMessage += "Transaction was rejected by user.";
+      } else if (error.code === -32603) {
+        errorMessage += "Internal error. Please try again.";
+      } else {
+        errorMessage += error.message || "Unknown error occurred.";
+      }
+
+      addMessage("bot", errorMessage);
+    }
+  };
+
+  // 🔥 Updated AI Processing with address support (bypass CryptoRank when addresses provided)
   const processWithAI = async (message) => {
     try {
-      // First step: Ask model ONLY to detect swaps with token symbols
+      // First step: Ask model ONLY to detect swaps with token symbols OR addresses
       const detection = await llm.invoke([
         new HumanMessage(
-          `You are a strict JSON detector. 
-        If the user is asking for a token swap, return ONLY a JSON object in this format:
-        {"inputTokenSymbol":"TOKEN_SYMBOL", "outputTokenSymbol":"TOKEN_SYMBOL", "inputAmount":"a_number", "chainID":"like hyperevm,arbitrum,avalanche,base,berachain,bnb,ethereum,gnosis,optimism,polygon,unichain"}
+          `You are a strict JSON detector.
+If the user is asking for a token swap, return ONLY a JSON object in this format:
 
-        example request : swap 1 kHYPE for USOL on the hyperevm chain
-        expected response: {"inputTokenSymbol":"kHYPE", "outputTokenSymbol":"USOL", "inputAmount":"1", "chainID":"hyperevm"}
+- If symbols are provided:
+{"inputTokenSymbol":"TOKEN_SYMBOL", "outputTokenSymbol":"TOKEN_SYMBOL", "inputAmount":"a_number", "chainID":"like hyperevm,arbitrum,avalanche,base,berachain,bnb,ethereum,gnosis,optimism,polygon,unichain"}
 
-        If it's NOT a swap request, return exactly: {"swap": false}`
+- If contract addresses are provided:
+{"inputTokenAddress":"0x...", "outputTokenAddress":"0x...", "inputAmount":"a_number", "chainID":"like hyperevm,arbitrum,avalanche,base,berachain,bnb,ethereum,gnosis,optimism,polygon,unichain"}
+
+example request using symbols: swap 1 kHYPE for USOL on the hyperevm chain
+expected response: {"inputTokenSymbol":"kHYPE", "outputTokenSymbol":"USOL", "inputAmount":"1", "chainID":"hyperevm"}
+
+example request using addresses: swap 1 0x1111... for 0x2222... on hyperevm
+expected response: {"inputTokenAddress":"0x1111...", "outputTokenAddress":"0x2222...", "inputAmount":"1", "chainID":"hyperevm"}
+
+If it's NOT a swap request, return exactly: {"swap": false}`
         ),
         new HumanMessage(message),
       ]);
@@ -261,21 +373,15 @@ e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain
 
       // If swap detected → return swap intent
       if (
-        parsed.inputTokenSymbol &&
-        parsed.outputTokenSymbol &&
         parsed.inputAmount &&
-        parsed.chainID
+        parsed.chainID &&
+        ((parsed.inputTokenSymbol && parsed.outputTokenSymbol) ||
+          (parsed.inputTokenAddress && parsed.outputTokenAddress))
       ) {
         return {
           intent: "swap",
-          response:
-            "Got it! Let me fetch the token contract addresses and quote...",
-          swapData: {
-            inputTokenSymbol: parsed.inputTokenSymbol,
-            outputTokenSymbol: parsed.outputTokenSymbol,
-            inputAmount: parseFloat(parsed.inputAmount),
-            chainID: parsed.chainID,
-          },
+          response: "Got it! Let me fetch the token details and quote...",
+          swapData: parsed,
         };
       }
 
@@ -289,7 +395,7 @@ e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain
       console.error("Groq AI Error:", error);
       return {
         intent: "error",
-        response: "⚠️ Error connecting to Groq AI. Please try again later.",
+        response: "⚠ Error connecting to Groq AI. Please try again later.",
       };
     }
   };
@@ -305,30 +411,48 @@ e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain
 
       if (aiResponse.intent === "swap" && isConnected) {
         try {
-          // Get token contract addresses from CryptoRank API
-          addMessage("bot", "🔍 Fetching token contract addresses...");
+          let inputTokenData, outputTokenData;
 
-          const [inputTokenData, outputTokenData] = await Promise.all([
-            getTokenContractAddress(
-              aiResponse.swapData.inputTokenSymbol,
-              aiResponse.swapData.chainID
-            ),
-            getTokenContractAddress(
-              aiResponse.swapData.outputTokenSymbol,
-              aiResponse.swapData.chainID
-            ),
-          ]);
+          // ✅ If user provided addresses → bypass CryptoRank
+          if (aiResponse.swapData.inputTokenAddress) {
+            inputTokenData = {
+              address: aiResponse.swapData.inputTokenAddress,
+              decimals: 18, // default (cannot infer without chain call)
+              symbol: "TOKEN1",
+              blockchain: aiResponse.swapData.chainID,
+            };
+            outputTokenData = {
+              address: aiResponse.swapData.outputTokenAddress,
+              decimals: 18, // default
+              symbol: "TOKEN2",
+              blockchain: aiResponse.swapData.chainID,
+            };
+          } else {
+            // ✅ Else → fetch addresses via CryptoRank
+            addMessage("bot", "🔍 Fetching token contract addresses...");
 
-          addMessage(
-            "bot",
-            `✅ Found contracts:\n• ${inputTokenData.symbol}: ${inputTokenData.address}\n• ${outputTokenData.symbol}: ${outputTokenData.address}`
-          );
+            [inputTokenData, outputTokenData] = await Promise.all([
+              getTokenContractAddress(
+                aiResponse.swapData.inputTokenSymbol,
+                aiResponse.swapData.chainID
+              ),
+              getTokenContractAddress(
+                aiResponse.swapData.outputTokenSymbol,
+                aiResponse.swapData.chainID
+              ),
+            ]);
+
+            addMessage(
+              "bot",
+              `✅ Found contracts:\n• ${inputTokenData.symbol}: ${inputTokenData.address}\n• ${outputTokenData.symbol}: ${outputTokenData.address}`
+            );
+          }
 
           // Now fetch swap quote using the contract addresses
           const quote = await fetchSwapQuote({
             inputTokenAddress: inputTokenData.address,
             outputTokenAddress: outputTokenData.address,
-            inputAmount: aiResponse.swapData.inputAmount,
+            inputAmount: parseFloat(aiResponse.swapData.inputAmount),
             inputTokenDecimals: inputTokenData.decimals,
             outputTokenDecimals: outputTokenData.decimals,
             chainID: aiResponse.swapData.chainID,
@@ -344,7 +468,7 @@ e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain
             };
             addMessage("bot", "Here's your swap quote:", enhancedQuote);
           } else {
-            addMessage("bot", "⚠️ Failed to fetch swap quote. Try again.");
+            addMessage("bot", "⚠ Failed to fetch swap quote. Try again.");
           }
         } catch (error) {
           console.error("Token lookup error:", error);
@@ -353,7 +477,7 @@ e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain
       } else if (aiResponse.intent === "swap" && !isConnected) {
         addMessage(
           "bot",
-          "⚠️ Please connect your wallet first to perform swaps."
+          "⚠ Please connect your wallet first to perform swaps."
         );
       } else {
         addMessage("bot", aiResponse.response);
@@ -372,45 +496,72 @@ e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain
     }
   };
 
-  const SwapQuoteCard = ({ swapData }) => (
-    <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mt-3 shadow-sm">
-      <div className="flex items-center gap-2 mb-3">
-        <ArrowUpDown className="w-4 h-4 text-indigo-600" />
-        <span className="font-medium text-indigo-800">Swap Quote</span>
+  const SwapQuoteCard = ({ swapData }) => {
+    const [isExecuting, setIsExecuting] = useState(false);
+
+    const handleExecuteSwap = async () => {
+      setIsExecuting(true);
+      try {
+        await executeSwap(swapData);
+      } catch (error) {
+        console.error("Execute swap error:", error);
+      } finally {
+        setIsExecuting(false);
+      }
+    };
+
+    return (
+      <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mt-3 shadow-sm">
+        <div className="flex items-center gap-2 mb-3">
+          <ArrowUpDown className="w-4 h-4 text-indigo-600" />
+          <span className="font-medium text-indigo-800">Swap Quote</span>
+        </div>
+
+        <div className="space-y-2 text-sm">
+          <div>
+            <p className="text-gray-600">
+              Input Token: {swapData.inputTokenSymbol || "Unknown"}
+            </p>
+            <p className="text-gray-600">
+              Input Amount: {swapData.inputAmount}
+            </p>
+          </div>
+          <div>
+            <p className="text-gray-600">
+              Output Token: {swapData.outputTokenSymbol || "Unknown"}
+            </p>
+            <p className="text-gray-600">
+              Output Amount: ~{swapData.outputAmount}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-gray-600">
+              Exchange Rate: 1 {swapData.inputTokenSymbol} ≈{" "}
+              {(swapData.outputAmount / swapData.inputAmount).toFixed(6)}{" "}
+              {swapData.outputTokenSymbol}
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={handleExecuteSwap}
+          disabled={isExecuting || !swapData.apiResponse}
+          className="w-full mt-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-2 shadow transition"
+        >
+          {isExecuting ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" /> Processing...
+            </>
+          ) : (
+            <>
+              <CheckCircle className="w-4 h-4" /> Execute Swap
+            </>
+          )}
+        </button>
       </div>
-
-      <div className="space-y-2 text-sm">
-        <div>
-          <p className="text-gray-600">
-            Input Token: {swapData.inputTokenSymbol || "Unknown"}
-          </p>
-          <p className="text-gray-600">Input Amount: {swapData.inputAmount}</p>
-          
-        </div>
-        <div>
-          <p className="text-gray-600">
-            Output Token: {swapData.outputTokenSymbol || "Unknown"}
-          </p>
-          <p className="text-gray-600">
-            Output Amount: ~{swapData.outputAmount}
-          </p>
-         
-        </div>
-
-        <div>
-          <p className="text-gray-600">
-            Exchange Rate: 1 {swapData.inputTokenSymbol} ≈{" "}
-            {(swapData.outputAmount / swapData.inputAmount).toFixed(6)}{" "}
-            {swapData.outputTokenSymbol}
-          </p>
-        </div>
-      </div>
-
-      <button className="w-full mt-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-2 shadow transition">
-        <CheckCircle className="w-4 h-4" /> Execute Swap
-      </button>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col font-mono">
