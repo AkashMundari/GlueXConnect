@@ -12,15 +12,16 @@ import {
   Loader2,
 } from "lucide-react";
 
-
+// LangChain + Groq
 import { ChatGroq } from "@langchain/groq";
 import { HumanMessage } from "@langchain/core/messages";
 
 const SwapChatInterface = () => {
-
+  // Wallet state
   const [isConnected, setIsConnected] = useState(false);
   const [userAddress, setUserAddress] = useState("");
 
+  // Chat state
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -35,12 +36,13 @@ const SwapChatInterface = () => {
 
   const messagesEndRef = useRef(null);
 
-
+  // 🔑 Groq client (move key to env in production)
   const llm = new ChatGroq({
     apiKey: import.meta.env.VITE_GROQ_API_KEY,
     model: "llama3-8b-8192",
   });
 
+  // CryptoRank API key
   const cryptoRankApiKey = import.meta.env.VITE_CRYPTORANK_API_KEY;
 
   const uniquePID = import.meta.env.VITE_GLUEX_PID;
@@ -53,10 +55,39 @@ const SwapChatInterface = () => {
     scrollToBottom();
   }, [messages]);
 
+  // ✅ Moralis API integration (fetch metadata when addresses are given)
+  const getTokenMetadataFromMoralis = async (address, chainID) => {
+    try {
+      const response = await fetch(
+        `https://deep-index.moralis.io/api/v2.2/erc20/metadata?chain=${chainID}&addresses%5B0%5D=${address}`,
+        {
+          headers: {
+            "X-API-Key": import.meta.env.VITE_MORALIS_API_KEY,
+          },
+        }
+      );
 
+      if (!response.ok) {
+        throw new Error(`Moralis API failed: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log(data[0]);
+      return {
+        address: data[0].address,
+        decimals: parseInt(data[0].decimals, 10),
+        symbol: data[0].symbol,
+        blockchain: chainID,
+      };
+    } catch (error) {
+      console.error("Moralis API Error:", error);
+      throw error;
+    }
+  };
+
+  // ✅ CryptoRank API integration (fallback when only symbols provided)
   const getTokenContractAddress = async (symbol, blockchainKey) => {
     try {
-   
       const mapUrl = "https://api.cryptorank.io/v2/currencies/map";
       const mapResponse = await fetch(mapUrl, {
         method: "GET",
@@ -80,7 +111,6 @@ const SwapChatInterface = () => {
 
       const cryptoId = cryptoInfo.id;
 
-
       const currencyUrl = `https://api.cryptorank.io/v2/currencies/${cryptoId}`;
       const currencyResponse = await fetch(currencyUrl, {
         method: "GET",
@@ -98,7 +128,6 @@ const SwapChatInterface = () => {
       const currencyData = await currencyResponse.json();
 
       if (currencyData.data && currencyData.data.contracts) {
-   
         const filteredContracts = currencyData.data.contracts.filter(
           (contract) =>
             contract.platform &&
@@ -115,10 +144,10 @@ const SwapChatInterface = () => {
         } else {
           throw new Error(
             `No contract found for ${symbol} on ${blockchainKey}
-
-You may try using the exact token contract address of the tokens you want to swap.
-
-e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain_name>`
+            
+It might be that the blockchain or token is not supported by CryptoRank.
+            
+You can try to use the token contract addresses for example : "swap 1 <input_token_contract_address> to <output_token_contract_address> on <chain_name>"`
           );
         }
       } else {
@@ -130,7 +159,7 @@ e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain
     }
   };
 
-
+  // Wallet functions
   const handleConnectWallet = async () => {
     if (typeof window.ethereum !== "undefined") {
       try {
@@ -165,7 +194,7 @@ e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain
     );
   };
 
-
+  // Chat functions
   const addMessage = (type, content, swapData = null) => {
     const newMessage = {
       id: Date.now(),
@@ -177,7 +206,7 @@ e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain
     setMessages((prev) => [...prev, newMessage]);
   };
 
-
+  // 🔥 Swap API integration
   const fetchSwapQuote = async ({
     inputTokenAddress,
     outputTokenAddress,
@@ -192,7 +221,7 @@ e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain
       chainID: chainID,
       inputToken: inputTokenAddress,
       outputToken: outputTokenAddress,
-      inputAmount: inputAmount * 10 ** inputTokenDecimals, // scale amount using actual decimals
+      inputAmount: inputAmount * 10 ** inputTokenDecimals,
       orderType: "SELL",
       userAddress,
       outputReceiver: userAddress,
@@ -217,7 +246,7 @@ e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain
       console.log("Quote Response:", data);
       return {
         inputAmount,
-        outputAmount: data.result.outputAmount / 10 ** outputTokenDecimals, 
+        outputAmount: data.result.outputAmount / 10 ** outputTokenDecimals,
         inputTokenAddress,
         outputTokenAddress,
         inputTokenDecimals,
@@ -231,7 +260,7 @@ e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain
     }
   };
 
-
+  // Execute swap transaction (unchanged)
   const executeSwap = async (swapData) => {
     try {
       addMessage("bot", "🔄 Initiating swap transaction...");
@@ -242,7 +271,6 @@ e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain
         throw new Error("Invalid swap data received from API");
       }
 
- 
       const transactionParams = {
         from: userAddress,
         to: apiResponse.router,
@@ -250,7 +278,7 @@ e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain
         value: apiResponse.value || "0x0",
         gas: apiResponse.computationUnits
           ? `0x${apiResponse.computationUnits.toString(16)}`
-          : "0x1E8480", 
+          : "0x1E8480",
       };
 
       console.log("Transaction Params:", transactionParams);
@@ -265,7 +293,6 @@ e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain
         `✅ Transaction submitted successfully!\n\nTransaction Hash: ${txHash}\n\nYour swap is being processed. Please wait for confirmation on the blockchain.`
       );
 
-
       const waitForConfirmation = async () => {
         try {
           let receipt = null;
@@ -279,10 +306,11 @@ e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain
                 params: [txHash],
               });
             } catch (e) {
+              console.log(e);
             }
 
             if (!receipt) {
-              await new Promise((resolve) => setTimeout(resolve, 10000)); 
+              await new Promise((resolve) => setTimeout(resolve, 10000));
               attempts++;
             }
           }
@@ -313,7 +341,6 @@ e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain
         }
       };
 
-  
       waitForConfirmation();
     } catch (error) {
       console.error("Transaction Error:", error);
@@ -331,10 +358,9 @@ e.g : swap <swap_amount> <contract_address_1> for <contract_address_2> on <chain
     }
   };
 
- 
+  // 🔥 AI Processing
   const processWithAI = async (message) => {
     try {
-    
       const detection = await llm.invoke([
         new HumanMessage(
           `You are a strict JSON detector.
@@ -349,8 +375,8 @@ If the user is asking for a token swap, return ONLY a JSON object in this format
 example request using symbols: swap 1 kHYPE for USOL on the hyperevm chain
 expected response: {"inputTokenSymbol":"kHYPE", "outputTokenSymbol":"USOL", "inputAmount":"1", "chainID":"hyperevm"}
 
-example request using addresses: swap 1 0x1111... for 0x2222... on hyperevm
-expected response: {"inputTokenAddress":"0x1111...", "outputTokenAddress":"0x2222...", "inputAmount":"1", "chainID":"hyperevm"}
+example request using addresses: swap 1 0x1111... for 0x2222... on arbitrum
+expected response: {"inputTokenAddress":"0x1111...", "outputTokenAddress":"0x2222...", "inputAmount":"1", "chainID":"arbitrum"}
 
 If it's NOT a swap request, return exactly: {"swap": false}`
         ),
@@ -364,12 +390,14 @@ If it's NOT a swap request, return exactly: {"swap": false}`
         parsed = { swap: false };
       }
 
- 
       if (
         parsed.inputAmount &&
-        parsed.chainID &&
-        ((parsed.inputTokenSymbol && parsed.outputTokenSymbol) ||
-          (parsed.inputTokenAddress && parsed.outputTokenAddress))
+        ((parsed.inputTokenSymbol &&
+          parsed.outputTokenSymbol &&
+          parsed.chainID) ||
+          (parsed.inputTokenAddress &&
+            parsed.outputTokenAddress &&
+            parsed.chainID))
       ) {
         return {
           intent: "swap",
@@ -377,7 +405,6 @@ If it's NOT a swap request, return exactly: {"swap": false}`
           swapData: parsed,
         };
       }
-
 
       const normalReply = await llm.invoke([new HumanMessage(message)]);
       return {
@@ -393,6 +420,7 @@ If it's NOT a swap request, return exactly: {"swap": false}`
     }
   };
 
+  // Handle user message
   const handleSendMessage = async () => {
     if (!inputMessage.trim()) return;
     const userMessage = inputMessage.trim();
@@ -406,24 +434,20 @@ If it's NOT a swap request, return exactly: {"swap": false}`
         try {
           let inputTokenData, outputTokenData;
 
-     
+          // ✅ If addresses provided → use Moralis API separately
           if (aiResponse.swapData.inputTokenAddress) {
-            inputTokenData = {
-              address: aiResponse.swapData.inputTokenAddress,
-              decimals: 18, 
-              symbol: "TOKEN1",
-              blockchain: aiResponse.swapData.chainID,
-            };
-            outputTokenData = {
-              address: aiResponse.swapData.outputTokenAddress,
-              decimals: 18,
-              symbol: "TOKEN2",
-              blockchain: aiResponse.swapData.chainID,
-            };
+            addMessage("bot", "🔍 Fetching token metadata from Moralis...");
+            inputTokenData = await getTokenMetadataFromMoralis(
+              aiResponse.swapData.inputTokenAddress,
+              aiResponse.swapData.chainID
+            );
+            outputTokenData = await getTokenMetadataFromMoralis(
+              aiResponse.swapData.outputTokenAddress,
+              aiResponse.swapData.chainID
+            );
           } else {
-         
+            // ✅ Else use CryptoRank API
             addMessage("bot", "🔍 Fetching token contract addresses...");
-
             [inputTokenData, outputTokenData] = await Promise.all([
               getTokenContractAddress(
                 aiResponse.swapData.inputTokenSymbol,
@@ -678,4 +702,3 @@ If it's NOT a swap request, return exactly: {"swap": false}`
 };
 
 export default SwapChatInterface;
-
