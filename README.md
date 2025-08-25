@@ -60,6 +60,7 @@ An AI-powered cryptocurrency swap assistant that enables seamless token swapping
    VITE_GROQ_API_KEY=your_groq_api_key_here
    VITE_CRYPTORANK_API_KEY=your_cryptorank_api_key_here
    VITE_GLUEX_PID=your_gluex_pid_here
+   VITE_MORALIS_API_KEY=your_moralis_key_here
    ```
 
 4. **Start the development server**
